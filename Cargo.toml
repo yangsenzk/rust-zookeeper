@@ -1,6 +1,6 @@
 [package]
 name = "zookeeper-zk"
-version = "0.7.1"
+version = "0.7.2"
 authors = ["yansen.zk <yangsen.zk@qq.com>", "Nandor Kracser <bonifaido@gmail.com>"]
 license = "MIT"
 homepage = "https://github.com/yangsenzk/rust-zookeeper"
