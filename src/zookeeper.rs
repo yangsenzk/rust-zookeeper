@@ -9,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use mio_extras::channel::Sender as MioSender;
+use retry::{delay::Fixed, retry};
 
 use crate::acl::*;
 use crate::consts::*;
@@ -74,7 +75,7 @@ impl ZooKeeper {
         let (watch, watch_sender) = ZkWatch::new(watcher, chroot.clone());
         let listeners = ListenerSet::<ZkState>::new();
         let listeners1 = listeners.clone();
-        let io = ZkIo::new(addrs.clone(), timeout, watch_sender, listeners1);
+        let io = ZkIo::new(String::from(connect_string), addrs.clone(), timeout, watch_sender, listeners1);
         let sender = io.sender();
 
         Self::zk_thread("event", move || watch.run().unwrap())?;
@@ -99,19 +100,25 @@ impl ZooKeeper {
             None => (None, connect_string.len()),
         };
 
-        let mut addrs = Vec::new();
-        for addr_str in connect_string[..end].split(',') {
-            let addr = match addr_str.trim().to_socket_addrs() {
-                Ok(mut addrs) => match addrs.nth(0) {
-                    Some(addr) => addr,
-                    None => return Err(ZkError::BadArguments),
-                },
-                Err(_) => return Err(ZkError::BadArguments),
+        let mut parsed_addrs = Vec::new();
+        for addr_str in connect_string.split(",") {
+            let parsed_sock = retry(Fixed::from_millis(10).take(10), || {
+                addr_str.trim().to_socket_addrs()
+            });
+            match parsed_sock {
+                Ok(addrs) => {
+                    for a in addrs.into_iter() {
+                        parsed_addrs.push(a);
+                    }
+                }
+                Err(e) => {
+                    eprintln!("failed to refresh host of {}, error: {}", addr_str, e);
+                    return Err(ZkError::BadArguments);
+                }
             };
-            addrs.push(addr);
         }
 
-        Ok((addrs, chroot))
+        Ok((parsed_addrs, chroot))
     }
 
     fn xid(&self) -> i32 {
