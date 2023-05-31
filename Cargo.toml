@@ -21,6 +21,7 @@ mio-extras = "2"
 snowflake = "1.0.0"
 zookeeper_derive = { path = "zookeeper-derive", version = "0.4.1" }
 retry = "2.0"
+rand = "0"
 
 [dev-dependencies]
 env_logger = "0.7"

@@ -1,7 +1,6 @@
 use std::collections::VecDeque;
 use std::io;
 use std::io::{Cursor, ErrorKind};
-use std::mem;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -282,8 +281,8 @@ impl ZkIo {
 
     fn clear_timeout(&mut self, atype: ZkTimeout) {
         let timeout = match atype {
-            ZkTimeout::Ping => mem::replace(&mut self.ping_timeout, None),
-            ZkTimeout::Connect => mem::replace(&mut self.conn_timeout, None),
+            ZkTimeout::Ping => self.ping_timeout.take(), // mem::replace(&mut self.ping_timeout, None),
+            ZkTimeout::Connect => self.conn_timeout.take(), // mem::replace(&mut self.conn_timeout, None),
         };
         if let Some(timeout) = timeout {
             trace!("clear_timeout: {:?}", atype);
@@ -296,11 +295,11 @@ impl ZkIo {
         trace!("start_timeout: {:?}", atype);
         match atype {
             ZkTimeout::Ping => {
-                let duration = self.ping_timeout_duration.clone();
+                let duration = self.ping_timeout_duration;
                 self.ping_timeout = Some(self.timer.set_timeout(duration, atype));
             }
             ZkTimeout::Connect => {
-                let duration = self.conn_timeout_duration.clone();
+                let duration = self.conn_timeout_duration;
                 self.conn_timeout = Some(self.timer.set_timeout(duration, atype));
             }
         }
@@ -335,12 +334,10 @@ impl ZkIo {
             self.clear_timeout(ZkTimeout::Ping);
             self.clear_timeout(ZkTimeout::Connect);
             {
-                match self.refresh_hosts() {
-                    Err(e) => {
-                        error!("Failed to refresh hosts {}, error: {}", self.connect_str, e);
-                    }
-                    Ok(_) => {}
+                if let Err(e) = self.refresh_hosts() {
+                    error!("Failed to refresh hosts {}, error: {}", self.connect_str, e);
                 }
+
                 let host = self.hosts.get();
                 info!("Connecting to new server {:?}", host);
                 self.sock = match TcpStream::connect(host) {
@@ -370,7 +367,7 @@ impl ZkIo {
     /// refresh all the backend endpoints in case of cloud native environment that all pod ip changed.
     fn refresh_hosts(&mut self) -> Result<(), ZkError> {
         let mut socket_addr: Vec<SocketAddr> = vec![];
-        for addr_str in self.connect_str.split(",") {
+        for addr_str in self.connect_str.split(',') {
             match retry(Fixed::from_millis(10).take(10), || {
                 addr_str.trim().to_socket_addrs()
             }) {
@@ -385,7 +382,7 @@ impl ZkIo {
                 }
             }
         }
-        if socket_addr.len() > 0 {
+        if !socket_addr.is_empty() {
             info!("refreshed host of {}: {:?}", self.connect_str,socket_addr);
             self.hosts.update_hosts(socket_addr);
         }

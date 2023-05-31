@@ -9,6 +9,7 @@ use std::thread;
 use std::time::Duration;
 
 use mio_extras::channel::Sender as MioSender;
+use rand::{seq::SliceRandom, thread_rng};
 use retry::{delay::Fixed, retry};
 
 use crate::acl::*;
@@ -75,7 +76,7 @@ impl ZooKeeper {
         let (watch, watch_sender) = ZkWatch::new(watcher, chroot.clone());
         let listeners = ListenerSet::<ZkState>::new();
         let listeners1 = listeners.clone();
-        let io = ZkIo::new(String::from(connect_string), addrs.clone(), timeout, watch_sender, listeners1);
+        let io = ZkIo::new(String::from(connect_string), addrs, timeout, watch_sender, listeners1);
         let sender = io.sender();
 
         Self::zk_thread("event", move || watch.run().unwrap())?;
@@ -92,7 +93,7 @@ impl ZooKeeper {
     }
 
     fn parse_connect_string(connect_string: &str) -> ZkResult<(Vec<SocketAddr>, Option<String>)> {
-        let (chroot, end) = match connect_string.find('/') {
+        let (chroot, _end) = match connect_string.find('/') {
             Some(start) => match &connect_string[start..connect_string.len()] {
                 "" | "/" => (None, start),
                 chroot => (Some(Self::validate_path(chroot)?.to_owned()), start),
@@ -101,7 +102,7 @@ impl ZooKeeper {
         };
 
         let mut parsed_addrs = Vec::new();
-        for addr_str in connect_string.split(",") {
+        for addr_str in connect_string.split(',') {
             let parsed_sock = retry(Fixed::from_millis(10).take(10), || {
                 addr_str.trim().to_socket_addrs()
             });
@@ -117,7 +118,7 @@ impl ZooKeeper {
                 }
             };
         }
-
+        parsed_addrs.shuffle(&mut thread_rng());
         Ok((parsed_addrs, chroot))
     }
 
@@ -171,7 +172,7 @@ impl ZooKeeper {
         match path {
             "" => Err(ZkError::BadArguments),
             path => {
-                if path.len() > 1 && path.chars().last() == Some('/') {
+                if path.len() > 1 && path.ends_with('/') {
                     Err(ZkError::BadArguments)
                 } else {
                     Ok(path)

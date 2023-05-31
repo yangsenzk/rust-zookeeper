@@ -1,13 +1,14 @@
-use crate::{
-    paths, Acl, CreateMode, Subscription, WatchedEvent, WatchedEventType, ZkError, ZkResult,
-    ZkState, ZooKeeper,
-};
 use std::{
     cmp, iter,
     sync::{
-        atomic::{self, AtomicBool, AtomicU8},
-        Arc, Mutex,
+        Arc,
+        atomic::{self, AtomicBool, AtomicU8}, Mutex,
     },
+};
+
+use crate::{
+    Acl, CreateMode, paths, Subscription, WatchedEvent, WatchedEventType, ZkError, ZkResult,
+    ZkState, ZooKeeper,
 };
 
 const LATCH_PREFIX: &str = "latch";
@@ -209,10 +210,10 @@ fn create_latch_znode(ll: &LeaderLatch, parent_path: &str, id: &str) -> ZkResult
 }
 
 fn get_latch_znodes(zk: &ZooKeeper, parent_path: &str) -> ZkResult<Vec<ZNode>> {
-    let znodes = zk.get_children(&parent_path, false)?;
+    let znodes = zk.get_children(parent_path, false)?;
     let mut latch_znodes: Vec<_> = znodes
         .into_iter()
-        .filter_map(|path| ZNode::with_parent(&parent_path, &path))
+        .filter_map(|path| ZNode::with_parent(parent_path, &path))
         .collect();
     latch_znodes.sort();
     Ok(latch_znodes)

@@ -28,7 +28,7 @@ impl ZkQueue {
     /// Inserts data into the queue
     pub fn offer(&self, data: Vec<u8>) -> ZkResult<String> {
         self.zk.create(
-            &*format!("{}/{}", self.dir, ZK_DISTRIBUTEDQUEUE_PREFIX),
+            &format!("{}/{}", self.dir, ZK_DISTRIBUTEDQUEUE_PREFIX),
             data,
             Acl::open_unsafe().clone(),
             CreateMode::PersistentSequential)
@@ -97,7 +97,7 @@ impl ZkQueue {
     pub fn peek(&self) -> ZkResult<Option<Vec<u8>>> {
         let op = self.ordered_children(Some(|_|{}))?;
         Ok(match op.is_empty() {
-            false => Some(self.zk.get_data(&*format!("{}/{}", self.dir, op[0]), false)?.0),
+            false => Some(self.zk.get_data(&format!("{}/{}", self.dir, op[0]), false)?.0),
             true => None
         })
     }
